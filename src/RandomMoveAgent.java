@@ -20,6 +20,7 @@
 //package edu.cwru.sepia.agent;
 
 
+import java.awt.Point;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ import edu.cwru.sepia.action.DirectedAction;
 import edu.cwru.sepia.action.TargetedAction;
 import edu.cwru.sepia.agent.Agent;
 import edu.cwru.sepia.environment.model.history.History;
+import edu.cwru.sepia.environment.model.state.ResourceType;
 import edu.cwru.sepia.environment.model.state.State.StateView;
 import edu.cwru.sepia.environment.model.state.Unit.UnitView;
 import edu.cwru.sepia.util.Direction;
@@ -57,9 +59,13 @@ public class RandomMoveAgent extends Agent {
 	private int numVisits[][];
 	private int numHits[][];
 	private double pathFoundProb;
+	private boolean seenGold = false;
+	private Point goldLoc = new Point();
+	private Integer goldId;
+	
+	private PreviousState prevState;
 	
 //	private int goldRequired;//TODO are these needed?
-//	private int woodRequired;
 	
 	StateView currentState;
 	private int step;
@@ -71,6 +77,16 @@ public class RandomMoveAgent extends Agent {
 		
 		boardSizeRow = 0;
 		boardSizeColumn = 0;
+	}
+
+	
+	@Override
+	public Map<Integer, Action> initialStep(StateView newState, History.HistoryView statehistory) {
+		step = 0;
+		currentState = newState;
+		
+		boardSizeColumn = currentState.getXExtent();
+		boardSizeRow = currentState.getYExtent();
 		
 		pathFoundProb = 0.0;
 		
@@ -87,17 +103,10 @@ public class RandomMoveAgent extends Agent {
 				numHits[i][j] = 0;
 			}
 		}
-	}
-
-	
-	@Override
-	public Map<Integer, Action> initialStep(StateView newState, History.HistoryView statehistory) {
-		step = 0;
-		currentState = newState;
 		
-		boardSizeColumn = currentState.getXExtent();
-		boardSizeRow = currentState.getYExtent();
 		List<Integer> allUnitIds = currentState.getAllUnitIds();
+		HashMap<Integer, Integer> peasantHP = new HashMap<Integer, Integer>();
+		HashMap<Integer, Point> peasantLoc = new HashMap<Integer, Point>();
 		peasantIds = new ArrayList<Integer>();
 		townhallIds = new ArrayList<Integer>();
 		for(int i = 0; i < allUnitIds.size(); i++) {
@@ -109,8 +118,15 @@ public class RandomMoveAgent extends Agent {
 			}
 			if(unitTypeName.equals("Peasant")) {
 				peasantIds.add(id);
+				peasantHP.put(id, unit.getHP());
+				Point unitLoc = new Point();
+				unitLoc.x = unit.getXPosition();
+				unitLoc.y = unit.getYPosition();
+				peasantLoc.put(id, unitLoc);
 			}
 		}
+		
+		prevState = new PreviousState(peasantIds, peasantHP, peasantLoc);
 		
 		return middleStep(newState, statehistory);
 	}
@@ -124,45 +140,60 @@ public class RandomMoveAgent extends Agent {
 		}
 		Map<Integer, Action> builder = new HashMap<Integer, Action>();
 		
-		List<Integer> allUnitIds = currentState.getAllUnitIds();
-		peasantIds = new ArrayList<Integer>();
-		for(int i = 0; i < allUnitIds.size(); i++) {
-			int id = allUnitIds.get(i);
-			UnitView unit = currentState.getUnit(id);
-			String unitTypeName = unit.getTemplateView().getName();			
-			if(unitTypeName.equals("Peasant")) {
-				peasantIds.add(id);
-			}
-		}
+		//ANALYZE PHASE
 		
-		for(int peasant : peasantIds) {
-			int peasantX = currentState.getUnit(peasant).getXPosition();
-			int peasantY = currentState.getUnit(peasant).getYPosition();
+		
+		for(int peasantID : prevState.getPeasantIds()) {
+			if(prevState.getPeasantHP(peasantID) == -1) {	//this happens when someone gets killed
+				Point peasantLoc = prevState.getPeasantLoc(peasantID);
+				numHits[peasantLoc.x][peasantLoc.y]++;
+				numVisits[peasantLoc.x][peasantLoc.y]++;
+				
+				//TODO do this if someone got produced
+				List<Integer> allUnitIds = currentState.getAllUnitIds();
+				peasantIds = new ArrayList<Integer>();
+				for(int i = 0; i < allUnitIds.size(); i++) {
+					int id = allUnitIds.get(i);
+					UnitView unit = currentState.getUnit(id);
+					String unitTypeName = unit.getTemplateView().getName();		
+					if(unitTypeName.equals("Peasant")) {
+						peasantIds.add(id);
+					}
+				}
+				
+				continue;
+			}
+
+			UnitView peasant = currentState.getUnit(peasantID);
+			
+			int peasantX = peasant.getXPosition();
+			int peasantY = peasant.getYPosition();
 			setSeenLocations(peasantX, peasantY);
 			numVisits[peasantX][peasantY]++;
-			if(true) { //got hit
+			if(prevState.getPeasantHP(peasantID) > peasant.getHP()) { //got hit
 				numHits[peasantX][peasantY]++;
+				prevState.setPeasantHP(peasantID, peasant.getHP());
 				//TODO update tower probabilities
 			} else { //didn't get hit
 				//TODO update tower probabilities
 			}
 			
+			//DECIDE MOVE PHASE
 			Action b = null;
 			
-			if() { //adjacent to gold and has nothing in hand, gather
-				b = new TargetedAction(peasant, ActionType.COMPOUNDGATHER, 3); //TODO need resourceID of the gold mine
-			} else if() { //adjacent to townhall and has something in hand, deposit
-				b = new TargetedAction(peasantIds.get(0), ActionType.COMPOUNDDEPOSIT, townhallIds.get(0));
-				
+			if(seenGold && peasant.getCargoAmount() == 0 && adjacentToGold(peasant)) { //adjacent to gold and has nothing in hand, gather
+				b = new TargetedAction(peasantID, ActionType.COMPOUNDGATHER, goldId);
+			} else if(peasant.getCargoAmount() != 0 && adjacentToTownhall(peasant)) { //adjacent to townhall and has something in hand, deposit
+				b = new TargetedAction(peasantID, ActionType.COMPOUNDDEPOSIT, townhallIds.get(0));
 			} else { //move somewhere
-				Direction toMove = findNextMove(peasant);
-				b = new DirectedAction(peasant, ActionType.PRIMITIVEMOVE, toMove);
+				Direction toMove = findNextMove(peasantID);
+				b = new DirectedAction(peasantID, ActionType.PRIMITIVEMOVE, toMove);
 			}
 			
-			builder.put(peasant, b);
-			
+			builder.put(peasantID, b);
 		}
 
+		//EXECUTE MOVE PHASE
 		
 		return builder;
 	}
@@ -178,7 +209,50 @@ public class RandomMoveAgent extends Agent {
 			logger.fine("Congratulations! You have finished the task!");
 		}
 	}
+
+	/**
+	 * 
+	 * @param peasant - The peasant you are concerned with
+	 * @return True if the peasant is next to the townhall
+	 */
+	private boolean adjacentToTownhall(UnitView peasant) {
+		UnitView townhall = currentState.getUnit(townhallIds.get(0));
+		Point townhallLoc = new Point();
+		townhallLoc.x = townhall.getXPosition();
+		townhallLoc.y = townhall.getYPosition();
+		
+		Point peasantLoc = new Point();
+		peasantLoc.x = peasant.getXPosition();
+		peasantLoc.y = peasant.getYPosition();
+		
+		if(Math.abs(townhallLoc.x - peasantLoc.x) <= 1
+				&& Math.abs(townhallLoc.y - peasantLoc.y) <= 1) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * 
+	 * @param peasant - The peasant you are concerned with
+	 * @return True if the peasant is next to the gold
+	 */
+	private boolean adjacentToGold(UnitView peasant) {
+		Point peasantLoc = new Point();
+		peasantLoc.x = peasant.getXPosition();
+		peasantLoc.y = peasant.getYPosition();
+		if(Math.abs(peasantLoc.x - goldLoc.x) <= 1
+				&& Math.abs(peasantLoc.y - goldLoc.y) <= 1) {
+			return true;
+		}
+		return false;
+	}
 	
+	/**
+	 * 
+	 * @param x - x location
+	 * @param y - y location
+	 */
 	private void setSeenLocations(int x, int y) {
 		//passes in location of the peasant
 		//sets every location within range of sight to true
@@ -202,13 +276,30 @@ public class RandomMoveAgent extends Agent {
 		for(int i = lowerRow; i < upperRow; i++) {
 			for(int j = lowerCol; j < upperCol; j++) {
 				hasSeen[i][j] = true;
+				
+				if(currentState.isResourceAt(i, j)) {
+					Integer resource = currentState.resourceAt(i, j);
+					if(currentState.getResourceNode(resource).getType().equals(ResourceType.GOLD)) {
+						seenGold = true;
+						goldLoc = new Point(i, j);
+						goldId = resource;
+					}
+				} else if(currentState.unitAt(i, j) != null && currentState.unitAt(i, j) != townhallIds.get(0)) {
+					towerProb[i][j] = 1;
+				} else {
+					towerProb[i][j] = 0;
+				}
 			}
 		}
 	}
 	
+	/**
+	 * 
+	 * @param peasantID - The ID of the peasant you are concerned with
+	 * @return The direction with the least probability of getting hit
+	 */
 	private Direction findNextMove(int peasantID) {
 		//TODO calculate probabilities of getting hit at each adjacent location
-		//return the direction with the least probability of getting hit
 		//make sure nothing is gonna be there (like a tree or another peasant)
 		
 		//make it easy to add an objective function
@@ -217,7 +308,13 @@ public class RandomMoveAgent extends Agent {
 		
 		return Direction.NORTH;
 	}
-	
+
+	/**
+	 * 
+	 * @param x - Potential x location
+	 * @param y - Potential y location
+	 * @return Probability of getting hit at (x, y)
+	 */
 	private double probOfGettingHit(int x, int y) {
 		//TODO calculate probability of getting hit at (x,y)
 		return 0.0;
