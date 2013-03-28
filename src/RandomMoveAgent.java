@@ -211,6 +211,8 @@ public class RandomMoveAgent extends Agent {
 	private Direction findNextMove(int peasantID) {
 		//TODO calculate probabilities of getting hit at each adjacent location
 		//return the direction with the least probability of getting hit
+		//make sure nothing is gonna be there (like a tree or another peasant)
+		
 		//make it easy to add an objective function
 //		double moveProbs[] = new double[8];
 		
