@@ -22,7 +22,6 @@
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.channels.SeekableByteChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,14 +30,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import edu.cwru.sepia.action.Action;
-import edu.cwru.sepia.action.ActionType;
-import edu.cwru.sepia.action.TargetedAction;
 import edu.cwru.sepia.agent.Agent;
 import edu.cwru.sepia.environment.model.history.History;
-import edu.cwru.sepia.environment.model.state.ResourceNode.Type;
-import edu.cwru.sepia.environment.model.state.ResourceType;
 import edu.cwru.sepia.environment.model.state.State.StateView;
-import edu.cwru.sepia.environment.model.state.Template.TemplateView;
 import edu.cwru.sepia.environment.model.state.Unit.UnitView;
 import edu.cwru.sepia.util.Direction;
 
@@ -71,7 +65,7 @@ public class RandomMoveAgent extends Agent {
 	public RandomMoveAgent(int playernum, String[] arguments) {
 		super(playernum);
 		
-		boardSizeRow = 0;//TODO get dimensions of board
+		boardSizeRow = 0;
 		boardSizeColumn = 0;
 		
 		pathFoundProb = 0.0;
@@ -96,6 +90,9 @@ public class RandomMoveAgent extends Agent {
 	public Map<Integer, Action> initialStep(StateView newState, History.HistoryView statehistory) {
 		step = 0;
 		currentState = newState;
+		
+		boardSizeColumn = currentState.getXExtent();
+		boardSizeRow = currentState.getYExtent();
 		
 		return middleStep(newState, statehistory);
 	}
