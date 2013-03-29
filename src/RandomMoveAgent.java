@@ -33,11 +33,13 @@ import java.util.logging.Logger;
 import edu.cwru.sepia.action.Action;
 import edu.cwru.sepia.action.ActionType;
 import edu.cwru.sepia.action.DirectedAction;
+import edu.cwru.sepia.action.ProductionAction;
 import edu.cwru.sepia.action.TargetedAction;
 import edu.cwru.sepia.agent.Agent;
 import edu.cwru.sepia.environment.model.history.History;
 import edu.cwru.sepia.environment.model.state.ResourceType;
 import edu.cwru.sepia.environment.model.state.State.StateView;
+import edu.cwru.sepia.environment.model.state.Template.TemplateView;
 import edu.cwru.sepia.environment.model.state.Unit.UnitView;
 import edu.cwru.sepia.util.Direction;
 
@@ -63,6 +65,8 @@ public class RandomMoveAgent extends Agent {
 	private Point goldLoc = new Point();
 	private Integer goldId;
 	
+	private boolean producedPeasant;
+	
 	private PreviousState prevState;
 	
 //	private int goldRequired;//TODO are these needed?
@@ -71,6 +75,8 @@ public class RandomMoveAgent extends Agent {
 	private int step;
 	private ArrayList<Integer> peasantIds;
 	private ArrayList<Integer> townhallIds;
+	
+	private Direction directions[] = new Direction[8];
 
 	public RandomMoveAgent(int playernum, String[] arguments) {
 		super(playernum);
@@ -79,6 +85,17 @@ public class RandomMoveAgent extends Agent {
 		boardSizeColumn = 0;
 		
 		pathFoundProb = 0.0;
+		
+		producedPeasant = false;
+		
+		directions[0] = Direction.NORTH;
+		directions[1] = Direction.NORTHEAST;
+		directions[2] = Direction.EAST;
+		directions[3] = Direction.SOUTHEAST;
+		directions[4] = Direction.SOUTH;
+		directions[5] = Direction.SOUTHWEST;
+		directions[6] = Direction.WEST;
+		directions[7] = Direction.NORTHWEST;
 	}
 
 	
@@ -141,13 +158,35 @@ public class RandomMoveAgent extends Agent {
 		Map<Integer, Action> builder = new HashMap<Integer, Action>();
 		
 		//ANALYZE PHASE
+		
+		prevState.removeMarked();
+		
+		//TODO what happens if you produce a peasant on the same turn as one dies?
+		//TODO this assumes that the peasant takes one turn to produce
+		if(producedPeasant) {
+			List<Integer> allUnitIds = currentState.getAllUnitIds();
+			peasantIds = new ArrayList<Integer>();
+			for(int i = 0; i < allUnitIds.size(); i++) {
+				int id = allUnitIds.get(i);
+				UnitView unit = currentState.getUnit(id);
+				String unitTypeName = unit.getTemplateView().getName();		
+				if(unitTypeName.equals("Peasant")) {
+					peasantIds.add(id);
+				}
+			}
+			int peasantID = peasantIds.get(peasantIds.size() - 1);
+			UnitView peasant = currentState.getUnit(peasantID);
+			prevState.addPeasant(peasantID, peasant.getHP(), new Point(peasant.getXPosition(), peasant.getYPosition()));
+			producedPeasant = false;
+		}
+		
 		for(int peasantID : prevState.getPeasantIds()) {
-			if(prevState.getPeasantHP(peasantID) == -1) {	//this happens when someone gets killed
+			//TODO fix this so that it actually checks if someone got killed
+			if(prevState.getPeasantHP(peasantID) == null) {	//this happens when someone gets killed
 				Point peasantLoc = prevState.getPeasantLoc(peasantID);
 				numHits[peasantLoc.x][peasantLoc.y]++;
 				numVisits[peasantLoc.x][peasantLoc.y]++;
 				
-				//TODO do this if someone got produced
 				List<Integer> allUnitIds = currentState.getAllUnitIds();
 				peasantIds = new ArrayList<Integer>();
 				for(int i = 0; i < allUnitIds.size(); i++) {
@@ -158,9 +197,10 @@ public class RandomMoveAgent extends Agent {
 						peasantIds.add(id);
 					}
 				}
-				continue; //TODO need to update the prevState to reflect missing peasant
+				prevState.markForRemoval(peasantID);
+				continue;
 			}
-
+			
 			UnitView peasant = currentState.getUnit(peasantID);
 			
 			int peasantX = peasant.getXPosition();
@@ -177,6 +217,14 @@ public class RandomMoveAgent extends Agent {
 			
 			//DECIDE MOVE PHASE
 			Action b = null;
+			
+			if(peasantIds.size() == 1 && currentState.getResourceAmount(0, ResourceType.GOLD) >= 400) {
+				TemplateView peasantTemplate = currentState.getTemplate(0, "Peasant");
+				int peasantTemplateId = peasantTemplate.getID();
+				b = new ProductionAction(townhallIds.get(0), ActionType.COMPOUNDPRODUCE, peasantTemplateId);
+				builder.put(peasantID, b);
+				producedPeasant = true;
+			}
 			
 			if(seenGold && peasant.getCargoAmount() == 0 && adjacentToGold(peasant)) { //adjacent to gold and has nothing in hand, gather
 				b = new TargetedAction(peasantID, ActionType.COMPOUNDGATHER, goldId);
@@ -252,25 +300,25 @@ public class RandomMoveAgent extends Agent {
 	 */
 	private void setSeenLocations(int x, int y) {
 		//sets every location within range of sight to true
-		int lowerRow = x - 2;
-		if(lowerRow < 0) {
-			lowerRow = 0;
+		int westColumn = x - 2;
+		if(westColumn < 0) {
+			westColumn = 0;
 		}
-		int upperRow = x + 3;
-		if(upperRow > boardSizeRow) {
-			upperRow = boardSizeRow;
+		int eastColumn = x + 2;
+		if(eastColumn > boardSizeColumn) {
+			eastColumn = boardSizeColumn - 1;
 		}
-		int lowerCol = y - 2;
-		if(lowerCol < 0) {
-			lowerCol = 0;
+		int northRow = y - 2;
+		if(northRow < 0) {
+			northRow = 0;
 		}
-		int upperCol = y + 3;
-		if(upperCol > boardSizeColumn) {
-			upperCol = boardSizeColumn;
+		int southRow = y + 2;
+		if(southRow > boardSizeRow) {
+			southRow = boardSizeRow - 1;
 		}
 		
-		for(int i = lowerRow; i < upperRow; i++) {
-			for(int j = lowerCol; j < upperCol; j++) {
+		for(int i = northRow; i <= southRow; i++) {
+			for(int j = westColumn; j <= eastColumn; j++) {
 				hasSeen[i][j] = true;
 				
 				if(currentState.isResourceAt(i, j)) {
@@ -301,9 +349,82 @@ public class RandomMoveAgent extends Agent {
 		//make it easy to add an objective function
 //		double moveProbs[] = new double[8];
 		
+		//iterate over all 8 directions
+		//find which ones take you closer to the gold or townhall (depending on what the peasant is carrying)
+		//find which of those has the lowest probability of getting hit
 		
-		return Direction.NORTH;
+		double minProb = 1;
+		Direction dirToMove = null;
+		
+		UnitView peasant = currentState.getUnit(peasantID);
+		int currentX = peasant.getXPosition();
+		int currentY = peasant.getYPosition();
+		
+		int deltaX = 0;
+		int deltaY = 0;
+		for(Direction dir : directions) {
+			switch(dir) {
+			case NORTH:
+				deltaX = 0;
+				deltaY = -1;
+				break;
+			case NORTHEAST:
+				deltaX = 1;
+				deltaY = -1;
+				break;
+			case EAST:
+				deltaX = 1;
+				deltaY = 0;
+				break;
+			case SOUTHEAST:
+				deltaX = 1;
+				deltaY = 1;
+				break;
+			case SOUTH:
+				deltaX = 0;
+				deltaY = 1;
+				break;
+			case SOUTHWEST:
+				deltaX = -1;
+				deltaY = 1;
+				break;
+			case WEST:
+				deltaX = -1;
+				deltaY = 0;
+				break;
+			case NORTHWEST:
+				deltaX = -1;
+				deltaY = -1;
+				break;
+			}
+			
+			if(!currentState.inBounds(currentX + deltaX, currentY + deltaY)) {
+				continue;
+			}
+			
+			double currentProb = probOfGettingHit(currentX + deltaX, currentY + deltaY) 
+					+ objectiveFunction(currentX + deltaX, currentY + deltaY);
+			if(currentProb < minProb) {
+				minProb = currentProb;
+				dirToMove = dir;
+			}
+		}
+		
+		return dirToMove;
 	}
+
+	/**
+	 * 
+	 * @param x - x coordinate of peasant's location
+	 * @param y - y coordinate of peasant's location
+	 * @return Factors in utility of getting closer to goal
+	 */
+	private double objectiveFunction(int x, int y) {
+		//should return negative numbers for useful places
+		//0 <= Math.abs(return value) <= 1
+		return 0;
+	}
+
 
 	/**
 	 * 
@@ -314,6 +435,43 @@ public class RandomMoveAgent extends Agent {
 	private double probOfGettingHit(int x, int y) {
 		//TODO calculate probability of getting hit at (x,y)
 		return 0.0;
+	}
+	
+	/**
+	 * Updates the probabilities of towers being at various locations
+	 * given whether or not the peasant got hit at its current location.
+	 * @param gotHit - True if the peasant got hit at the location
+	 * @param peasantLoc - The peasants location
+	 */
+	private void updateTowerProbs(boolean gotHit, Point peasantLoc) {
+		int x = peasantLoc.x;
+		int y = peasantLoc.y;
+		
+		int westColumn = x - 5;
+		if(westColumn < 0) {
+			westColumn = 0;
+		}
+		int eastColumn = x + 5;
+		if(eastColumn > boardSizeColumn) {
+			eastColumn = boardSizeColumn - 1;
+		}
+		int northRow = y - 5;
+		if(northRow < 0) {
+			northRow = 0;
+		}
+		int southRow = y + 5;
+		if(southRow > boardSizeRow) {
+			southRow = boardSizeRow - 1;
+		}
+		
+		for(int i = northRow; i <= southRow; i++) {
+			for(int j = westColumn; j <= eastColumn; j++) {
+				if(hasSeen[i][j]) {
+					continue;
+				}
+				
+			}
+		}
 	}
 
 	@Override
