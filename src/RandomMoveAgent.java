@@ -77,6 +77,8 @@ public class RandomMoveAgent extends Agent {
 		
 		boardSizeRow = 0;
 		boardSizeColumn = 0;
+		
+		pathFoundProb = 0.0;
 	}
 
 	
@@ -87,8 +89,6 @@ public class RandomMoveAgent extends Agent {
 		
 		boardSizeColumn = currentState.getXExtent();
 		boardSizeRow = currentState.getYExtent();
-		
-		pathFoundProb = 0.0;
 		
 		hasSeen = new boolean[boardSizeRow][boardSizeColumn];
 		towerProb = new double[boardSizeRow][boardSizeColumn];
@@ -141,8 +141,6 @@ public class RandomMoveAgent extends Agent {
 		Map<Integer, Action> builder = new HashMap<Integer, Action>();
 		
 		//ANALYZE PHASE
-		
-		
 		for(int peasantID : prevState.getPeasantIds()) {
 			if(prevState.getPeasantHP(peasantID) == -1) {	//this happens when someone gets killed
 				Point peasantLoc = prevState.getPeasantLoc(peasantID);
@@ -160,8 +158,7 @@ public class RandomMoveAgent extends Agent {
 						peasantIds.add(id);
 					}
 				}
-				
-				continue;
+				continue; //TODO need to update the prevState to reflect missing peasant
 			}
 
 			UnitView peasant = currentState.getUnit(peasantID);
@@ -250,11 +247,10 @@ public class RandomMoveAgent extends Agent {
 	
 	/**
 	 * 
-	 * @param x - x location
-	 * @param y - y location
+	 * @param x - x peasant location
+	 * @param y - y peasant location
 	 */
 	private void setSeenLocations(int x, int y) {
-		//passes in location of the peasant
 		//sets every location within range of sight to true
 		int lowerRow = x - 2;
 		if(lowerRow < 0) {
