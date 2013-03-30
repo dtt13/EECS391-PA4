@@ -161,7 +161,6 @@ public class RandomMoveAgent extends Agent {
 		
 		prevState.removeMarked();
 		
-		//TODO what happens if you produce a peasant on the same turn as one dies?
 		//TODO this assumes that the peasant takes one turn to produce
 		if(producedPeasant) {
 			List<Integer> allUnitIds = currentState.getAllUnitIds();
@@ -182,7 +181,12 @@ public class RandomMoveAgent extends Agent {
 		
 		for(int peasantID : prevState.getPeasantIds()) {
 			//TODO fix this so that it actually checks if someone got killed
-			if(prevState.getPeasantHP(peasantID) == null) {	//this happens when someone gets killed
+			boolean killed = false;
+			if(!currentState.getUnitIds(0).contains(peasantID)) {
+				killed = true;
+			}
+//			if(prevState.getPeasantHP(peasantID) == null) {	//this happens when someone gets killed
+			if(killed) {
 				Point peasantLoc = prevState.getPeasantLoc(peasantID);
 				numHits[peasantLoc.x][peasantLoc.y]++;
 				numVisits[peasantLoc.x][peasantLoc.y]++;

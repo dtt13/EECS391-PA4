@@ -22,7 +22,7 @@ public class PreviousState {
 	/**
 	 * 
 	 * @param id - The id of the peasant you are concerned with.
-	 * @return -1 if the peasant doesn't exist. The peasant's HP if it does exist.
+	 * @return null if the peasant doesn't exist. The peasant's HP if it does exist.
 	 */
 	public Integer getPeasantHP(int id) {
 		if(!peasantHP.containsKey(id)) {
