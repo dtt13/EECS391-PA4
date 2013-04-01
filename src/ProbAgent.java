@@ -397,7 +397,8 @@ public class ProbAgent extends Agent {
 				break;
 			}
 			
-			if(!currentState.inBounds(currentX + deltaX, currentY + deltaY)) {
+			if(!currentState.inBounds(currentX + deltaX, currentY + deltaY)
+					|| currentState.isResourceAt(currentX + deltaX, currentY + deltaY)) { //TODO what if another person will be there on the next turn?
 				continue;
 			}
 			
