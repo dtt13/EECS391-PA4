@@ -50,9 +50,9 @@ import edu.cwru.sepia.util.Direction;
  * @author Sam Fleckenstein
  *
  */
-public class RandomMoveAgent extends Agent {
+public class ProbAgent extends Agent {
 	private static final long serialVersionUID = -4047208702628325380L;
-	private static final Logger logger = Logger.getLogger(RandomMoveAgent.class.getCanonicalName());
+	private static final Logger logger = Logger.getLogger(ProbAgent.class.getCanonicalName());
 
 	private int boardSizeRow;
 	private int boardSizeColumn;
@@ -78,7 +78,7 @@ public class RandomMoveAgent extends Agent {
 	
 	private Direction directions[] = new Direction[8];
 
-	public RandomMoveAgent(int playernum, String[] arguments) {
+	public ProbAgent(int playernum, String[] arguments) {
 		super(playernum);
 		
 		boardSizeRow = 0;
@@ -181,12 +181,7 @@ public class RandomMoveAgent extends Agent {
 		
 		for(int peasantID : prevState.getPeasantIds()) {
 			//TODO fix this so that it actually checks if someone got killed
-			boolean killed = false;
 			if(!currentState.getUnitIds(0).contains(peasantID)) {
-				killed = true;
-			}
-//			if(prevState.getPeasantHP(peasantID) == null) {	//this happens when someone gets killed
-			if(killed) {
 				Point peasantLoc = prevState.getPeasantLoc(peasantID);
 				numHits[peasantLoc.x][peasantLoc.y]++;
 				numVisits[peasantLoc.x][peasantLoc.y]++;
