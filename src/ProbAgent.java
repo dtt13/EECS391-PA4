@@ -75,6 +75,7 @@ public class ProbAgent extends Agent {
 	private int step;
 	private ArrayList<Integer> peasantIds;
 	private ArrayList<Integer> townhallIds;
+	private ArrayList<Point> nextPeasantLocs;
 	
 	private Direction directions[] = new Direction[8];
 
@@ -179,6 +180,8 @@ public class ProbAgent extends Agent {
 			producedPeasant = false;
 		}
 		
+		nextPeasantLocs = new ArrayList<Point>();
+		
 		for(int peasantID : prevState.getPeasantIds()) {
 			//TODO fix this so that it actually checks if someone got killed
 			if(!currentState.getUnitIds(0).contains(peasantID)) {
@@ -217,6 +220,7 @@ public class ProbAgent extends Agent {
 			//DECIDE MOVE PHASE
 			Action b = null;
 			
+			//townhall actions
 			if(peasantIds.size() == 1 && currentState.getResourceAmount(0, ResourceType.GOLD) >= 400) {
 				TemplateView peasantTemplate = currentState.getTemplate(0, "Peasant");
 				int peasantTemplateId = peasantTemplate.getID();
@@ -225,9 +229,12 @@ public class ProbAgent extends Agent {
 				producedPeasant = true;
 			}
 			
+			//peasant actions
 			if(seenGold && peasant.getCargoAmount() == 0 && adjacentToGold(peasant)) { //adjacent to gold and has nothing in hand, gather
+				nextPeasantLocs.add(new Point(peasantX, peasantY));
 				b = new TargetedAction(peasantID, ActionType.COMPOUNDGATHER, goldId);
 			} else if(peasant.getCargoAmount() != 0 && adjacentToTownhall(peasant)) { //adjacent to townhall and has something in hand, deposit
+				nextPeasantLocs.add(new Point(peasantX, peasantY));
 				b = new TargetedAction(peasantID, ActionType.COMPOUNDDEPOSIT, townhallIds.get(0));
 			} else { //move somewhere
 				Direction toMove = findNextMove(peasantID);
@@ -342,22 +349,15 @@ public class ProbAgent extends Agent {
 	 * @return The direction with the least probability of getting hit
 	 */
 	private Direction findNextMove(int peasantID) {
-		//TODO calculate probabilities of getting hit at each adjacent location
-		//make sure nothing is gonna be there (like a tree or another peasant)
-		
-		//make it easy to add an objective function
-//		double moveProbs[] = new double[8];
-		
-		//iterate over all 8 directions
-		//find which ones take you closer to the gold or townhall (depending on what the peasant is carrying)
-		//find which of those has the lowest probability of getting hit
-		
 		double minProb = 1;
 		Direction dirToMove = null;
 		
 		UnitView peasant = currentState.getUnit(peasantID);
 		int currentX = peasant.getXPosition();
 		int currentY = peasant.getYPosition();
+		
+		int newX = currentX;
+		int newY = currentY;
 		
 		int deltaX = 0;
 		int deltaY = 0;
@@ -398,7 +398,8 @@ public class ProbAgent extends Agent {
 			}
 			
 			if(!currentState.inBounds(currentX + deltaX, currentY + deltaY)
-					|| currentState.isResourceAt(currentX + deltaX, currentY + deltaY)) { //TODO what if another person will be there on the next turn?
+					|| currentState.isResourceAt(currentX + deltaX, currentY + deltaY)
+					|| nextPeasantLocs.contains(new Point(currentX + deltaX, currentY + deltaY))) {
 				continue;
 			}
 			
@@ -407,9 +408,11 @@ public class ProbAgent extends Agent {
 			if(currentProb < minProb) {
 				minProb = currentProb;
 				dirToMove = dir;
+				newX = currentX + deltaX;
+				newY = currentY + deltaY;
 			}
 		}
-		
+		nextPeasantLocs.add(new Point(newX, newY));
 		return dirToMove;
 	}
 
