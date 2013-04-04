@@ -131,6 +131,9 @@ public class ProbAgent extends Agent {
 		boardSizeColumn = currentState.getXExtent();
 		boardSizeRow = currentState.getYExtent();
 		
+		goldLoc.x = boardSizeColumn - 1;
+		goldLoc.y = 0;
+		
 		hasSeen = new boolean[boardSizeRow][boardSizeColumn];
 		towerProb = new double[boardSizeRow][boardSizeColumn];
 		numVisits = new int[boardSizeRow][boardSizeColumn];
@@ -265,6 +268,8 @@ public class ProbAgent extends Agent {
 			
 			builder.put(peasantID, b);
 		}
+		
+		printTowerProbs();
 
 		//EXECUTE MOVE PHASE
 		
@@ -375,9 +380,13 @@ public class ProbAgent extends Agent {
 		int newX = currentX;
 		int newY = currentY;
 		
+		UnitView townhall = currentState.getUnit(townhallIds.get(0));
+		int townhallX = townhall.getXPosition();
+		int townhallY = townhall.getYPosition();
+		
 		int deltaX = 0;
 		int deltaY = 0;
-		for(Direction dir : directions) {
+		for(Direction dir : directions) { 	
 			switch(dir) {
 			case NORTH:
 				deltaX = 0;
@@ -415,10 +424,6 @@ public class ProbAgent extends Agent {
 			
 			Point nextLoc = new Point(currentX + deltaX, currentY + deltaY);
 			
-			UnitView townhall = currentState.getUnit(townhallIds.get(0));
-			int townhallX = townhall.getXPosition();
-			int townhallY = townhall.getYPosition();
-			
 			boolean moveOntoTownhall = ((currentX + deltaX == townhallX) && (currentY + deltaY == townhallY));
 		
 			if(!currentState.inBounds(currentX + deltaX, currentY + deltaY)
@@ -428,13 +433,15 @@ public class ProbAgent extends Agent {
 				continue;
 			}
 			
+			boolean hasCargo = peasant.getCargoAmount() > 0;
+			
 			double currentProb = probOfGettingHit(currentX + deltaX, currentY + deltaY) 
-					+ objectiveFunction(currentX + deltaX, currentY + deltaY);
+					+ objectiveFunction(!hasCargo, currentX, currentY, currentX + deltaX, currentY + deltaY);
 			if(currentProb < minProb) {
 				minProb = currentProb;
 				dirToMove = dir;
 				newX = currentX + deltaX;
-				newY = currentY + deltaY;
+ 				newY = currentY + deltaY;
 			}
 		}
 		nextPeasantLocs.add(new Point(newX, newY));
@@ -443,14 +450,34 @@ public class ProbAgent extends Agent {
 
 	/**
 	 * 
-	 * @param x - x coordinate of peasant's location
-	 * @param y - y coordinate of peasant's location
-	 * @return Factors in utility of getting closer to goal
+	 * @param toGold - True if the peasant is moving towards the gold
+	 * @param currentX - The peasant's current x coordinate
+	 * @param currentY - The peasant's current y coordinate
+	 * @param nextX - The potential next x coordinate
+	 * @param nextY - The potential next y coordinate
+	 * @return Factors in exploration, rather than just saftey of next moves
 	 */
-	private double objectiveFunction(int x, int y) {
-		//should return negative numbers for useful places
-		//0 <= Math.abs(return value) <= 1
-		return 0;
+	private double objectiveFunction(boolean toGold, int currentX, int currentY, int nextX, int nextY) {
+		double objectiveValue = 0;
+		
+		int currentDistance = 99999;
+		int nextDistance = 99999;
+		if(toGold) {
+			currentDistance += Math.abs(goldLoc.x - currentX) + Math.abs(goldLoc.y - currentY);
+			nextDistance += Math.abs(goldLoc.x - nextX) + Math.abs(goldLoc.y - nextY);
+		} else {
+			UnitView townhall = currentState.getUnit(townhallIds.get(0));
+			
+			currentDistance += Math.abs(townhall.getXPosition() - currentX) + Math.abs(townhall.getYPosition() - currentY);
+			nextDistance += Math.abs(townhall.getXPosition() - nextX) + Math.abs(townhall.getYPosition() - nextY);
+		}
+		
+		if(nextDistance < currentDistance) {
+			//TODO find the right value to use here
+			objectiveValue += -.70 * (currentDistance - nextDistance);
+		}
+		
+		return objectiveValue;
 	}
 	
 	/**
@@ -502,12 +529,19 @@ public class ProbAgent extends Agent {
 			
 			if(currentState.inBounds(tower.x, tower.y)
 					&& !hasSeen[tower.x][tower.y]) {
-				if(gotHit) {
-					towerProb[tower.x][tower.y] *= 0.75;
-				} else {
-					towerProb[tower.x][tower.y] *= 0.25;
-				}
-				probSum += towerProb[tower.x][tower.y];
+//				if(gotHit) {
+					towerProb[tower.x][tower.y] *= Math.pow(0.75, numHits[tower.x][tower.y]
+							* Math.pow(0.25, numVisits[tower.x][tower.y] - numHits[tower.x][tower.y]));
+//				} else {
+//					towerProb[tower.x][tower.y] *= 0.25;
+//				}
+//				probSum += towerProb[tower.x][tower.y];
+			}
+		}
+		
+		for(double[] array : towerProb) {
+			for(double prob : array) {
+				probSum += prob;
 			}
 		}
 		
@@ -519,6 +553,18 @@ public class ProbAgent extends Agent {
 				towerProb[tower.x][tower.y] /= probSum;
 			}
 		}
+	}
+	
+	public void printTowerProbs() {
+		for(double[] array : towerProb) {
+			for(double prob : array) {
+				System.out.print(Math.floor(prob * 10000) / 10000 + "  ");
+			}
+			System.out.println();
+		}
+		System.out.println();
+		System.out.println();
+		System.out.println();
 	}
 
 	@Override
