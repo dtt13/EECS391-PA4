@@ -183,7 +183,6 @@ public class ProbAgent extends Agent {
 		nextPeasantLocs = new ArrayList<Point>();
 		
 		for(int peasantID : prevState.getPeasantIds()) {
-			//TODO fix this so that it actually checks if someone got killed
 			if(!currentState.getUnitIds(0).contains(peasantID)) {
 				Point peasantLoc = prevState.getPeasantLoc(peasantID);
 				numHits[peasantLoc.x][peasantLoc.y]++;
