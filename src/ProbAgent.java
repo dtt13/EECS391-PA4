@@ -154,7 +154,7 @@ public class ProbAgent extends Agent {
 			int id = allUnitIds.get(i);
 			UnitView unit = currentState.getUnit(id);
 			String unitTypeName = unit.getTemplateView().getName();			
-			if(unitTypeName.equals("Townhall")) {
+			if(unitTypeName.equals("TownHall")) {
 				townhallIds.add(id);
 			}
 			if(unitTypeName.equals("Peasant")) {
@@ -328,26 +328,9 @@ public class ProbAgent extends Agent {
 	 */
 	private void setSeenLocations(int x, int y) {
 		//sets every location within range of sight to true
-		int westColumn = x - 2;
-		if(westColumn < 0) {
-			westColumn = 0;
-		}
-		int eastColumn = x + 2;
-		if(eastColumn > boardSizeColumn) {
-			eastColumn = boardSizeColumn - 1;
-		}
-		int northRow = y - 2;
-		if(northRow < 0) {
-			northRow = 0;
-		}
-		int southRow = y + 2;
-		if(southRow > boardSizeRow) {
-			southRow = boardSizeRow - 1;
-		}
-		
 		Point seen = new Point();
-		for(int i = -4; i <= 4; i++) {
-			for(int j = -4; j <= 4; j++) {
+		for(int i = -2; i <= 2; i++) {
+			for(int j = -2; j <= 2; j++) {
 				seen.x = x + i;
 				seen.y = y + j;
 				
@@ -362,10 +345,11 @@ public class ProbAgent extends Agent {
 							goldLoc = new Point(seen.x, seen.y);
 							goldId = resource;
 						}
+						towerProb[seen.x][seen.y] = 0.0;
 					} else if(currentState.unitAt(seen.x, seen.y) != null && currentState.unitAt(seen.x, seen.y) != townhallIds.get(0)) {
-						towerProb[seen.x][seen.y] = 1;
+						towerProb[seen.x][seen.y] = 1.0;  //TODO what if the unit is a peasant?!?!
 					} else {
-						towerProb[seen.x][seen.y] = 0;
+						towerProb[seen.x][seen.y] = 0.0;
 					}
 				}
 			}
