@@ -53,6 +53,9 @@ import edu.cwru.sepia.util.Direction;
 public class ProbAgent extends Agent {
 	private static final long serialVersionUID = -4047208702628325380L;
 	private static final Logger logger = Logger.getLogger(ProbAgent.class.getCanonicalName());
+	private static final double APPROX_TOWER_DENSITY = 0.0085;
+	
+	private static final Point[] deltaValues = new Point[16];
 
 	private int boardSizeRow;
 	private int boardSizeColumn;
@@ -97,6 +100,26 @@ public class ProbAgent extends Agent {
 		directions[5] = Direction.SOUTHWEST;
 		directions[6] = Direction.WEST;
 		directions[7] = Direction.NORTHWEST;
+		
+		deltaValues[0] = new Point(-4, 0);
+		deltaValues[1] = new Point(-3, -1);
+		deltaValues[2] = new Point(-3, 0);
+		deltaValues[3] = new Point(-3, 1);
+		
+		deltaValues[4] = new Point(4, 0);
+		deltaValues[5] = new Point(3, -1);
+		deltaValues[6] = new Point(3, 0);
+		deltaValues[7] = new Point(3, 1);
+		
+		deltaValues[8] = new Point(0, -4);
+		deltaValues[9] = new Point(1, -3);
+		deltaValues[10] = new Point(0, -3);
+		deltaValues[11] = new Point(-1, -3);
+		
+		deltaValues[12] = new Point(0, 4);
+		deltaValues[13] = new Point(1, 3);
+		deltaValues[14] = new Point(0, 3);
+		deltaValues[15] = new Point(-1, 3);
 	}
 
 	
@@ -116,7 +139,7 @@ public class ProbAgent extends Agent {
 		for(int i = 0; i < boardSizeRow; i++) {
 			for(int j = 0; j < boardSizeColumn; j++) {
 				hasSeen[i][j] = false;
-				towerProb[i][j] = 0.0;
+				towerProb[i][j] = APPROX_TOWER_DENSITY;
 				numVisits[i][j] = 0;
 				numHits[i][j] = 0;
 			}
@@ -322,21 +345,28 @@ public class ProbAgent extends Agent {
 			southRow = boardSizeRow - 1;
 		}
 		
-		for(int i = northRow; i <= southRow; i++) {
-			for(int j = westColumn; j <= eastColumn; j++) {
-				hasSeen[i][j] = true;
+		Point seen = new Point();
+		for(int i = -4; i <= 4; i++) {
+			for(int j = -4; j <= 4; j++) {
+				seen.x = x + i;
+				seen.y = y + j;
 				
-				if(currentState.isResourceAt(i, j)) {
-					Integer resource = currentState.resourceAt(i, j);
-					if(currentState.getResourceNode(resource).getType().equals(ResourceType.GOLD)) {
-						seenGold = true;
-						goldLoc = new Point(i, j);
-						goldId = resource;
+				if(currentState.inBounds(seen.x, seen.y)) {
+					
+					hasSeen[seen.x][seen.y] = true;
+					
+					if(currentState.isResourceAt(seen.x, seen.y)) {
+						Integer resource = currentState.resourceAt(seen.x, seen.y);
+						if(currentState.getResourceNode(resource).getType().equals(ResourceType.GOLD)) {
+							seenGold = true;
+							goldLoc = new Point(seen.x, seen.y);
+							goldId = resource;
+						}
+					} else if(currentState.unitAt(seen.x, seen.y) != null && currentState.unitAt(seen.x, seen.y) != townhallIds.get(0)) {
+						towerProb[seen.x][seen.y] = 1;
+					} else {
+						towerProb[seen.x][seen.y] = 0;
 					}
-				} else if(currentState.unitAt(i, j) != null && currentState.unitAt(i, j) != townhallIds.get(0)) {
-					towerProb[i][j] = 1;
-				} else {
-					towerProb[i][j] = 0;
 				}
 			}
 		}
@@ -426,17 +456,38 @@ public class ProbAgent extends Agent {
 		//0 <= Math.abs(return value) <= 1
 		return 0;
 	}
-
-
+	
 	/**
-	 * 
-	 * @param x - Potential x location
-	 * @param y - Potential y location
-	 * @return Probability of getting hit at (x, y)
+	 * Sums the probabilities there being a tower at
+	 * all of the locations that are in range of the
+	 * peasantLoc.
+	 * @param peasantLoc - Potential peasant location
+	 * @return Value proportional to probability of getting hit at (x, y)
 	 */
 	private double probOfGettingHit(int x, int y) {
-		//TODO calculate probability of getting hit at (x,y)
-		return 0.0;
+		double totalProb = 0;
+		
+		Point tower = new Point();
+		for(Point p : deltaValues) {
+			tower.x = x + p.x;
+			tower.y = y + p.y;
+			
+			if(currentState.inBounds(tower.x, tower.y)) {
+				totalProb += towerProb[tower.x][tower.y];
+			}
+		}
+		
+		for(int i = -2; i <= 2; i++) {
+			for(int j = -2; j <= 2; j++) {
+				tower.x = x + i;
+				tower.y = y + j;
+				
+				if(currentState.inBounds(tower.x, tower.y)) {
+					totalProb += towerProb[tower.x][tower.y];
+				}
+			}
+		}
+		return totalProb;
 	}
 	
 	/**
@@ -445,33 +496,31 @@ public class ProbAgent extends Agent {
 	 * @param gotHit - True if the peasant got hit at the location
 	 * @param peasantLoc - The peasants location
 	 */
-	private void updateTowerProbs(boolean gotHit, Point peasantLoc) {
-		int x = peasantLoc.x;
-		int y = peasantLoc.y;
+	private void updateTowerProbs(boolean gotHit, int x, int y) {
+		double probSum = 0;
 		
-		int westColumn = x - 5;
-		if(westColumn < 0) {
-			westColumn = 0;
-		}
-		int eastColumn = x + 5;
-		if(eastColumn > boardSizeColumn) {
-			eastColumn = boardSizeColumn - 1;
-		}
-		int northRow = y - 5;
-		if(northRow < 0) {
-			northRow = 0;
-		}
-		int southRow = y + 5;
-		if(southRow > boardSizeRow) {
-			southRow = boardSizeRow - 1;
-		}
-		
-		for(int i = northRow; i <= southRow; i++) {
-			for(int j = westColumn; j <= eastColumn; j++) {
-				if(hasSeen[i][j]) {
-					continue;
+		Point tower = new Point();
+		for(Point p : deltaValues) {
+			tower.x = x + p.x;
+			tower.y = y + p.y;
+			
+			if(currentState.inBounds(tower.x, tower.y)
+					&& !hasSeen[tower.x][tower.y]) {
+				if(gotHit) {
+					towerProb[tower.x][tower.y] *= 0.75;
+				} else {
+					towerProb[tower.x][tower.y] *= 0.25;
 				}
-				
+				probSum += towerProb[tower.x][tower.y];
+			}
+		}
+		
+		for(Point p : deltaValues) {
+			tower.x = x + p.x;
+			tower.y = y + p.y;
+			
+			if(currentState.inBounds(tower.x, tower.y)) {
+				towerProb[tower.x][tower.y] /= probSum;
 			}
 		}
 	}
