@@ -134,13 +134,13 @@ public class ProbAgent extends Agent {
 		goldLoc.x = boardSizeColumn - 1;
 		goldLoc.y = 0;
 		
-		hasSeen = new boolean[boardSizeRow][boardSizeColumn];
-		towerProb = new double[boardSizeRow][boardSizeColumn];
-		numVisits = new int[boardSizeRow][boardSizeColumn];
-		numHits = new int[boardSizeRow][boardSizeColumn];
+		hasSeen = new boolean[boardSizeColumn][boardSizeRow];
+		towerProb = new double[boardSizeColumn][boardSizeRow];
+		numVisits = new int[boardSizeColumn][boardSizeRow];
+		numHits = new int[boardSizeColumn][boardSizeRow];
 		
-		for(int i = 0; i < boardSizeRow; i++) {
-			for(int j = 0; j < boardSizeColumn; j++) {
+		for(int i = 0; i < boardSizeColumn; i++) {
+			for(int j = 0; j < boardSizeRow; j++) {
 				hasSeen[i][j] = false;
 				towerProb[i][j] = APPROX_TOWER_DENSITY;
 				numVisits[i][j] = 0;
@@ -340,7 +340,6 @@ public class ProbAgent extends Agent {
 				seen.y = y + j;
 				
 				if(currentState.inBounds(seen.x, seen.y)) {
-					
 					hasSeen[seen.x][seen.y] = true;
 					Integer unitID = currentState.unitAt(seen.x, seen.y);
 					
@@ -556,15 +555,25 @@ public class ProbAgent extends Agent {
 	}
 	
 	public void printTowerProbs() {
-		for(double[] array : towerProb) {
-			for(double prob : array) {
-				System.out.print(Math.floor(prob * 10000) / 10000 + "  ");
+		for(int i = 0; i < towerProb.length; i++) {
+			for(int j = 0; j < towerProb[i].length; j++) {
+				System.out.print("" + i + ", " + j + " " + Math.floor(towerProb[i][j] * 10000) / 10000 + "  ");
 			}
 			System.out.println();
 		}
 		System.out.println();
 		System.out.println();
 		System.out.println();
+		
+//		for(double[] array : towerProb) {
+//			for(double prob : array) {
+//				System.out.print(Math.floor(prob * 10000) / 10000 + "  ");
+//			}
+//			System.out.println();
+//		}
+//		System.out.println();
+//		System.out.println();
+//		System.out.println();
 	}
 
 	@Override
