@@ -362,7 +362,7 @@ public class ProbAgent extends Agent {
 	 * @return The direction with the least probability of getting hit
 	 */
 	private Direction findNextMove(int peasantID) {
-		double minProb = 1;
+		double minProb = 9999999;
 		Direction dirToMove = null;
 		
 		UnitView peasant = currentState.getUnit(peasantID);
