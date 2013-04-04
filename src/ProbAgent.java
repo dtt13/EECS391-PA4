@@ -234,9 +234,9 @@ public class ProbAgent extends Agent {
 			if(prevState.getPeasantHP(peasantID) > peasant.getHP()) { //got hit
 				numHits[peasantX][peasantY]++;
 				prevState.setPeasantHP(peasantID, peasant.getHP());
-				//TODO update tower probabilities
+				updateTowerProbs(true, peasantX, peasantY);
 			} else { //didn't get hit
-				//TODO update tower probabilities
+				updateTowerProbs(false, peasantX, peasantY);
 			}
 			
 			//DECIDE MOVE PHASE
@@ -337,6 +337,7 @@ public class ProbAgent extends Agent {
 				if(currentState.inBounds(seen.x, seen.y)) {
 					
 					hasSeen[seen.x][seen.y] = true;
+					Integer unitID = currentState.unitAt(seen.x, seen.y);
 					
 					if(currentState.isResourceAt(seen.x, seen.y)) {
 						Integer resource = currentState.resourceAt(seen.x, seen.y);
@@ -346,8 +347,10 @@ public class ProbAgent extends Agent {
 							goldId = resource;
 						}
 						towerProb[seen.x][seen.y] = 0.0;
-					} else if(currentState.unitAt(seen.x, seen.y) != null && currentState.unitAt(seen.x, seen.y) != townhallIds.get(0)) {
-						towerProb[seen.x][seen.y] = 1.0;  //TODO what if the unit is a peasant?!?!
+					} else if(unitID != null 
+							&& unitID != townhallIds.get(0)
+							&& !peasantIds.contains(unitID)) {
+						towerProb[seen.x][seen.y] = 1.0;
 					} else {
 						towerProb[seen.x][seen.y] = 0.0;
 					}
@@ -410,9 +413,18 @@ public class ProbAgent extends Agent {
 				break;
 			}
 			
+			Point nextLoc = new Point(currentX + deltaX, currentY + deltaY);
+			
+			UnitView townhall = currentState.getUnit(townhallIds.get(0));
+			int townhallX = townhall.getXPosition();
+			int townhallY = townhall.getYPosition();
+			
+			boolean moveOntoTownhall = ((currentX + deltaX == townhallX) && (currentY + deltaY == townhallY));
+		
 			if(!currentState.inBounds(currentX + deltaX, currentY + deltaY)
 					|| currentState.isResourceAt(currentX + deltaX, currentY + deltaY)
-					|| nextPeasantLocs.contains(new Point(currentX + deltaX, currentY + deltaY))) {
+					|| moveOntoTownhall
+					|| nextPeasantLocs.contains(nextLoc)) {
 				continue;
 			}
 			
