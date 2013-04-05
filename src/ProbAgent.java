@@ -466,7 +466,6 @@ public class ProbAgent extends Agent {
 			nextDistance += Math.abs(goldLoc.x - nextX) + Math.abs(goldLoc.y - nextY);
 		} else {
 			UnitView townhall = currentState.getUnit(townhallIds.get(0));
-			
 			currentDistance += Math.abs(townhall.getXPosition() - currentX) + Math.abs(townhall.getYPosition() - currentY);
 			nextDistance += Math.abs(townhall.getXPosition() - nextX) + Math.abs(townhall.getYPosition() - nextY);
 		}
@@ -489,6 +488,12 @@ public class ProbAgent extends Agent {
 	private double probOfGettingHit(int x, int y) {
 		double totalProb = 0;
 		
+		//TODO this should be fixed to calculate the real value
+		//for now, it makes the peasants slightly less retarded
+		if(numHits[x][y] > 0) {
+			return .75;
+		}
+		
 		Point tower = new Point();
 		for(Point p : deltaValues) {
 			tower.x = x + p.x;
@@ -501,14 +506,18 @@ public class ProbAgent extends Agent {
 		
 		for(int i = -2; i <= 2; i++) {
 			for(int j = -2; j <= 2; j++) {
-				tower.x = x + i;
-				tower.y = y + j;
+				tower.x = x + j;
+				tower.y = y + i;
 				
 				if(currentState.inBounds(tower.x, tower.y)) {
 					totalProb += towerProb[tower.x][tower.y];
 				}
 			}
 		}
+		if(x == 3 && y == 14) {
+			System.out.println(totalProb);
+		}
+		
 		return totalProb;
 	}
 	
@@ -528,13 +537,8 @@ public class ProbAgent extends Agent {
 			
 			if(currentState.inBounds(tower.x, tower.y)
 					&& !hasSeen[tower.x][tower.y]) {
-//				if(gotHit) {
-					towerProb[tower.x][tower.y] *= Math.pow(0.75, numHits[tower.x][tower.y]
-							* Math.pow(0.25, numVisits[tower.x][tower.y] - numHits[tower.x][tower.y]));
-//				} else {
-//					towerProb[tower.x][tower.y] *= 0.25;
-//				}
-//				probSum += towerProb[tower.x][tower.y];
+				towerProb[tower.x][tower.y] *= Math.pow(0.75, numHits[tower.x][tower.y] 
+						* Math.pow(0.25, numVisits[tower.x][tower.y] - numHits[tower.x][tower.y]));
 			}
 		}
 		
@@ -555,19 +559,9 @@ public class ProbAgent extends Agent {
 	}
 	
 	public void printTowerProbs() {
-		for(int i = 0; i < towerProb.length; i++) {
-			for(int j = 0; j < towerProb[i].length; j++) {
-				System.out.print("" + i + ", " + j + " " + Math.floor(towerProb[i][j] * 10000) / 10000 + "  ");
-			}
-			System.out.println();
-		}
-		System.out.println();
-		System.out.println();
-		System.out.println();
-		
-//		for(double[] array : towerProb) {
-//			for(double prob : array) {
-//				System.out.print(Math.floor(prob * 10000) / 10000 + "  ");
+//		for(int i = 0; i < towerProb.length; i++) {
+//			for(int j = 0; j < towerProb[i].length; j++) {
+//				System.out.print("" + i + ", " + j + " " + Math.floor(towerProb[i][j] * 10000) / 10000 + "  ");
 //			}
 //			System.out.println();
 //		}
