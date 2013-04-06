@@ -9,7 +9,6 @@ public class PreviousState {
 	private HashMap<Integer, Point> peasantLocs = new HashMap<Integer, Point>();
 	private ArrayList<Integer> toRemove = new ArrayList<Integer>();
 	
-	@SuppressWarnings("unchecked")
 	public PreviousState(ArrayList<Integer> peasantIds, HashMap<Integer, Integer> peasantHP, HashMap<Integer, Point> peasantLocs) {
 		for(Integer id : peasantIds) {
 			this.peasantIds.add(id);
