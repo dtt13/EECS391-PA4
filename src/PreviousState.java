@@ -7,14 +7,21 @@ public class PreviousState {
 	private ArrayList<Integer> peasantIds = new ArrayList<Integer>();
 	private HashMap<Integer, Integer> peasantHP = new HashMap<Integer, Integer>();
 	private HashMap<Integer, Point> peasantLocs = new HashMap<Integer, Point>();
+	private HashMap<Integer, Boolean[][]> hasCargo = new HashMap<Integer, Boolean[][]>();
 	private ArrayList<Integer> toRemove = new ArrayList<Integer>();
+	private int columns;
+	private int rows;
 	
-	public PreviousState(ArrayList<Integer> peasantIds, HashMap<Integer, Integer> peasantHP, HashMap<Integer, Point> peasantLocs) {
+	public PreviousState(ArrayList<Integer> peasantIds, HashMap<Integer, Integer> peasantHP, HashMap<Integer, Point> peasantLocs, int columns, int rows) {
 		for(Integer id : peasantIds) {
 			this.peasantIds.add(id);
 			this.peasantHP.put(id, peasantHP.get(id));
 			Point point = peasantLocs.get(id);
 			this.peasantLocs.put(id, new Point((int)(point.getX()), (int)(point.getY())));
+			this.columns = columns;
+			this.rows = rows;
+			Boolean cargo[][] = new Boolean[columns][rows];
+			this.hasCargo.put(id, cargo);
 		}
 	}
 	
@@ -63,6 +70,9 @@ public class PreviousState {
 			if(peasantLocs.containsKey(id)) {
 				peasantLocs.remove(id);
 			}
+			if(hasCargo.containsKey(id)) {
+				hasCargo.remove(id);
+			}
 		}
 		toRemove = new ArrayList<Integer>();
 	}
@@ -71,6 +81,16 @@ public class PreviousState {
 		this.peasantIds.add(peasantId);
 		this.peasantHP.put(peasantId, peasantHP);
 		this.peasantLocs.put(peasantId, new Point((int)(peasantLoc.getX()), (int)(peasantLoc.getY())));
+		Boolean cargo[][] = new Boolean[columns][rows];
+		this.hasCargo.put(peasantId, cargo);
+	}
+	
+	public Boolean getHasCargo(int peasantId, int x, int y) {
+		return hasCargo.get(peasantId)[x][y];
+	}
+
+	public void setHasCargo(int peasantId, int x, int y, boolean value) {
+		hasCargo.get(peasantId)[x][y] = value;
 	}
 	
 }
