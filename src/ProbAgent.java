@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -522,9 +523,10 @@ public class ProbAgent extends Agent {
 		double exploreFactor = -exploreCoeff * currentDistance * (currentDistance - avgBoardSize);// * (-.5 * numVisits[nextX][nextY] + 1);
 		
 		if(hadCargo != null && hadCargo.booleanValue() != hasCargo) {
-			objectiveValue -= 0.3;
+			objectiveValue -= 0.2;
 		} else if(hadCargo == null) {
-			objectiveValue -= exploreFactor;
+//			objectiveValue -= exploreFactor;
+			objectiveValue -= (numVisits[currentX][currentY] - numVisits[nextX][nextY]) * exploreFactor;
 		} else {
 			objectiveValue += 0.5;
 		}
@@ -532,9 +534,8 @@ public class ProbAgent extends Agent {
 //			System.out.println("Explore: " + exploreFactor);
 //			System.out.println("Dist: " + (double)(currentDistance - avgBoardSize));
 //			System.out.println("Linear: " + (double)(-.5 * numVisits[nextX][nextY] + 1));
-//			objectiveValue -= (numVisits[currentX][currentY] - numVisits[nextX][nextY]) * exploreFactor;
 //			objectiveValue -= 0.08 * goodPath[nextX][nextY];
-		
+
 		return objectiveValue;
 	}
 	
