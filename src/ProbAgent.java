@@ -251,7 +251,9 @@ public class ProbAgent extends Agent {
 				prevState.markForRemoval(peasantID);
 				continue;
 			}
+		}
 			
+		int peasantID = peasantIds.get(0);
 			UnitView peasant = currentState.getUnit(peasantID);
 			int peasantX = peasant.getXPosition();
 			int peasantY = peasant.getYPosition();
@@ -290,7 +292,7 @@ public class ProbAgent extends Agent {
 			}
 			
 			builder.put(peasantID, b);
-		}
+//		}
 		
 		printTowerProbs();
 		printGoodPath();
