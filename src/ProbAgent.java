@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -145,32 +144,32 @@ public class ProbAgent extends Agent {
 		for(int i = 0; i < boardSizeColumn; i++) {
 			for(int j = 0; j < boardSizeRow; j++) {
 				hasSeen[i][j] = false;
-//				towerProb[i][j] = APPROX_TOWER_DENSITY;
-				towerProb[i][j] = 0;
+				towerProb[i][j] = APPROX_TOWER_DENSITY;
+//				towerProb[i][j] = 0;
 				goodPath[i][j] = 0;
 				numVisits[i][j] = 0;
 				numHits[i][j] = 0;
 			}
 		}
-		boolean smallMap = (boardSizeColumn < 32);
-		if(smallMap) {
-			towerProb[2][1] = 1;
-			towerProb[14][7] = 1;//TODO remember to not hard code this
-			towerProb[6][10] = 1;
-			towerProb[16][17]= 1;
-		} else {
-			towerProb[5][3] = 1;
-			towerProb[14][7] = 1;
-			towerProb[16][8] = 1;
-			towerProb[22][11] = 1;
-			towerProb[24][11] = 1;
-			towerProb[6][13] = 1;
-			towerProb[8][13] = 1;
-			towerProb[30][17] = 1;
-			towerProb[24][21] = 1;
-			towerProb[23][25] = 1;
-			towerProb[6][24] = 1;
-		}
+//		boolean smallMap = (boardSizeColumn < 32);
+//		if(smallMap) {
+//			towerProb[2][1] = 1;
+//			towerProb[14][7] = 1;//TODO remember to not hard code this
+//			towerProb[6][10] = 1;
+//			towerProb[16][17]= 1;
+//		} else {
+//			towerProb[5][3] = 1;
+//			towerProb[14][7] = 1;
+//			towerProb[16][8] = 1;
+//			towerProb[22][11] = 1;
+//			towerProb[24][11] = 1;
+//			towerProb[6][13] = 1;
+//			towerProb[8][13] = 1;
+//			towerProb[30][17] = 1;
+//			towerProb[24][21] = 1;
+//			towerProb[23][25] = 1;
+//			towerProb[6][24] = 1;
+//		}
 		
 		List<Integer> allUnitIds = currentState.getAllUnitIds();
 		HashMap<Integer, Integer> peasantHP = new HashMap<Integer, Integer>();
@@ -233,10 +232,11 @@ public class ProbAgent extends Agent {
 		nextPeasantLocs = new ArrayList<Point>();
 		
 		for(int peasantID : prevState.getPeasantIds()) {
-			if(!currentState.getUnitIds(0).contains(peasantID)) {
+			if(!currentState.getUnitIds(0).contains(peasantID)) {		//peasant dies
 				Point peasantLoc = prevState.getPeasantLoc(peasantID);
 				numHits[peasantLoc.x][peasantLoc.y]++;
 				numVisits[peasantLoc.x][peasantLoc.y]++;
+				updateTowerProbs(true, peasantLoc.x, peasantLoc.y);
 				
 				List<Integer> allUnitIds = currentState.getAllUnitIds();
 				peasantIds = new ArrayList<Integer>();
@@ -260,9 +260,9 @@ public class ProbAgent extends Agent {
 			if(prevState.getPeasantHP(peasantID) > peasant.getHP()) { //got hit
 				numHits[peasantX][peasantY]++;
 				prevState.setPeasantHP(peasantID, peasant.getHP());
-//				updateTowerProbs(true, peasantX, peasantY);
+				updateTowerProbs(true, peasantX, peasantY);
 			} else { //didn't get hit
-//				updateTowerProbs(false, peasantX, peasantY);
+				updateTowerProbs(false, peasantX, peasantY);
 			}
 			
 			//DECIDE MOVE PHASE
@@ -515,21 +515,21 @@ public class ProbAgent extends Agent {
 		}
 		
 		if(nextDistance < currentDistance) {
-			objectiveValue -= 0.2 * (currentDistance - nextDistance);
+			objectiveValue -= 0.3 * (currentDistance - nextDistance);
 		}
 		
-		boolean hasCargo = (peasant.getCargoAmount() > 0);
-		Boolean hadCargo = prevState.getHasCargo(peasantId, nextX, nextY);
-		double exploreFactor = -exploreCoeff * currentDistance * (currentDistance - avgBoardSize);// * (-.5 * numVisits[nextX][nextY] + 1);
-		
-		if(hadCargo != null && hadCargo.booleanValue() != hasCargo) {
-			objectiveValue -= 0.2;
-		} else if(hadCargo == null) {
-//			objectiveValue -= exploreFactor;
-			objectiveValue -= (numVisits[currentX][currentY] - numVisits[nextX][nextY]) * exploreFactor;
-		} else {
-			objectiveValue += 0.5;
-		}
+//		boolean hasCargo = (peasant.getCargoAmount() > 0);
+//		Boolean hadCargo = prevState.getHasCargo(peasantId, nextX, nextY);
+//		double exploreFactor = -exploreCoeff * currentDistance * (currentDistance - avgBoardSize);// * (-.5 * numVisits[nextX][nextY] + 1);
+//		
+//		if(hadCargo != null && hadCargo.booleanValue() != hasCargo) {
+//			objectiveValue -= 0.2;
+//		} else if(hadCargo == null) {
+////		objectiveValue -= exploreFactor;
+//			objectiveValue -= (numVisits[currentX][currentY] - numVisits[nextX][nextY]) * exploreFactor;
+//		} else {
+//			objectiveValue += 0.5;
+//		}
 		
 //			System.out.println("Explore: " + exploreFactor);
 //			System.out.println("Dist: " + (double)(currentDistance - avgBoardSize));
@@ -564,8 +564,13 @@ public class ProbAgent extends Agent {
 				if(currentState.inBounds(tower.x, tower.y)) {
 					totalProb += towerProb[tower.x][tower.y];
 				}
+				
+				if(totalProb > .1) {
+					return .75;
+				}
 			}
 		}
+		return 0;
 		//TODO find the real deltaValues
 //		for(Point p : deltaValues) {
 //			tower.x = x + p.x;
@@ -592,64 +597,108 @@ public class ProbAgent extends Agent {
 //			System.out.println(totalProb);
 //		}
 		
-		return totalProb;
+//		return totalProb;
 	}
 	
 	/**
 	 * Updates the probabilities of towers being at various locations
 	 * given whether or not the peasant got hit at its current location.
 	 * @param gotHit - True if the peasant got hit at the location
-	 * @param peasantLoc - The peasant's location
+	 * @param x - The peasant's x location
+	 * @param y - The peasant's y location
 	 */
 	private void updateTowerProbs(boolean gotHit, int x, int y) {
-		double probSum = 0;
 		double changedSum = 0;
 		
+		int numTowers = (int)(APPROX_TOWER_DENSITY * boardSizeColumn * boardSizeRow + 3);
+		
 		Point tower = new Point();
-		for(int i = -4; i <= 4; i++) {
-			for(int j = -4; j <= 4; j++) {
-				tower.x = x + j;
-				tower.y = y + i;
-				
-				if(currentState.inBounds(tower.x, tower.y) 
-						&& !hasSeen[tower.x][tower.y]
-						&& towerProb[tower.x][tower.y] != 1) {
-					towerProb[tower.x][tower.y] *= Math.pow(0.75, numHits[x][y] 
-							* Math.pow(0.25, numVisits[x][y] - numHits[x][y]));
-					changedSum += towerProb[tower.x][tower.y];	
+		if(gotHit) {
+			for(int i = -4; i <= 4; i++) {
+				for(int j = -4; j <= 4; j++) {
+					tower.x = x + j;
+					tower.y = y + i;
+					
+					if(currentState.inBounds(tower.x, tower.y) 
+							&& !hasSeen[tower.x][tower.y]
+							&& towerProb[tower.x][tower.y] != 1) {
+						towerProb[tower.x][tower.y] *= binomialCoeff(numVisits[x][y], numHits[x][y])
+								* Math.pow(0.75, numHits[x][y]) 
+								* Math.pow(0.25, numVisits[x][y] - numHits[x][y]);
+						changedSum += towerProb[tower.x][tower.y];
+					}
+				}
+			}
+			for(int i = -4; i <= 4; i++) {
+				for(int j = -4; j <= 4; j++) {
+					tower.x = x + j;
+					tower.y = y + i;
+					
+					if(currentState.inBounds(tower.x, tower.y) 
+							&& !hasSeen[tower.x][tower.y]
+							&& towerProb[tower.x][tower.y] != 1) {
+						towerProb[tower.x][tower.y] /= changedSum;
+					}
+				}
+			}
+		} else {
+			for(int i = -4; i <= 4; i++) {
+				for(int j = -4; j <= 4; j++) {
+					tower.x = x + j;
+					tower.y = y + i;
+					
+					if(currentState.inBounds(tower.x, tower.y) 
+							&& !hasSeen[tower.x][tower.y]
+							&& towerProb[tower.x][tower.y] != 1) {
+						towerProb[tower.x][tower.y] *= (1 - binomialCoeff(numVisits[x][y], numHits[x][y])
+								* Math.pow(0.75, numHits[x][y]) 
+								* Math.pow(0.25, numVisits[x][y] - numHits[x][y]));
+					}
+				}
+			}
+
+			double totalSum = 0;
+			for(int i = 0; i < towerProb.length; i++) {
+				for(int j = 0; j < towerProb[i].length; j++) {
+					if(currentState.inBounds(i, j) 
+							&& !hasSeen[i][j]
+							&& towerProb[i][j] != 1) {
+						totalSum += towerProb[i][j];
+					}
+				}
+			}
+			
+//			for(int i = 0; i < towerProb.length; i++) {
+//				for(int j = 0; j < towerProb[i].length; j++) {
+//					if(currentState.inBounds(i, j) 
+//							&& !hasSeen[i][j]
+//							&& towerProb[i][j] != 1) {
+//						towerProb[i][j] = towerProb[i][j] / (totalSum * APPROX_TOWER_DENSITY);
+//					}
+//				}
+//			}
+			
+			for(int i = -4; i <= 4; i++) {
+				for(int j = -4; j <= 4; j++) {
+					tower.x = x + j;
+					tower.y = y + i;
+					
+					if(currentState.inBounds(tower.x, tower.y) 
+							&& !hasSeen[tower.x][tower.y]
+							&& towerProb[tower.x][tower.y] != 1) {
+						towerProb[tower.x][tower.y] /= totalSum;
+					}
 				}
 			}
 		}
-//		for(Point p : deltaValues) {
-//			tower.x = x + p.x;
-//			tower.y = y + p.y;
-//			
-//			if(currentState.inBounds(tower.x, tower.y) 
-//					&& !hasSeen[tower.x][tower.y]
-//					&& towerProb[tower.x][tower.y] != 1) {
-//				towerProb[tower.x][tower.y] *= Math.pow(0.75, numHits[x][y] 
-//						* Math.pow(0.25, numVisits[x][y] - numHits[x][y]));
-//				changedSum += towerProb[tower.x][tower.y];
+		
+		
+//		for(double[] array : towerProb) {
+//			for(double prob : array) {
+//				probSum += prob;
 //			}
 //		}
-		
-//		for(Point p : deltaValues) {
-//			tower.x = x + p.x;
-//			tower.y = y + p.y;
-//			
-//			if(currentState.inBounds(tower.x, tower.y) 
-//					&& !hasSeen[tower.x][tower.y]
-//					&& towerProb[tower.x][tower.y] != 1) {
-//				towerProb[tower.x][tower.y] /= changedSum;
-//			}
-//		}
-		
-		for(double[] array : towerProb) {
-			for(double prob : array) {
-				probSum += prob;
-			}
-		}
-		
+//		
 //		for(int i = 0; i < towerProb.length; i++) {
 //			for(int j = 0; j < towerProb[i].length; j++) {
 //				if(towerProb[i][j] != 1) {
@@ -659,28 +708,42 @@ public class ProbAgent extends Agent {
 //		}
 	}
 	
-	public void printTowerProbs() {
-//		for(int i = 0; i < towerProb.length; i++) {
-//			for(int j = 0; j < towerProb[i].length; j++) {
-//				System.out.print("" + i + ", " + j + " " + Math.floor(towerProb[i][j] * 10000) / 10000 + "  ");
-//			}
-//			System.out.println();
-//		}
-//		System.out.println();
-//		System.out.println();
-//		System.out.println();
+	private double binomialCoeff(int numVisits, int numHits) {
+		double numerator = 1;
+		for(int i = numVisits; i > numHits; i--) {
+			numerator *= i;
+		}
+		double denom = 1;
+		for(int i = numVisits - numHits; i > 0; i--) {
+			denom *= i;
+		}
+		
+		return numerator / denom;
 	}
 
-	public void printGoodPath() {
-		for(int i = 0; i < goodPath.length; i++) {
-			for(int j = 0; j < goodPath[i].length; j++) {
-				System.out.print("" + i + ", " + j + " " + goodPath[i][j] + "  ");
+
+	public void printTowerProbs() {
+		for(int i = 0; i < towerProb.length; i++) {
+			for(int j = 0; j < towerProb[i].length; j++) {
+				System.out.print("" + i + ", " + j + " " + Math.floor(towerProb[i][j] * 10000) / 10000 + "  ");
 			}
 			System.out.println();
 		}
 		System.out.println();
 		System.out.println();
 		System.out.println();
+	}
+
+	public void printGoodPath() {
+//		for(int i = 0; i < goodPath.length; i++) {
+//			for(int j = 0; j < goodPath[i].length; j++) {
+//				System.out.print("" + i + ", " + j + " " + goodPath[i][j] + "  ");
+//			}
+//			System.out.println();
+//		}
+//		System.out.println();
+//		System.out.println();
+//		System.out.println();
 	}
 	
 	@Override
