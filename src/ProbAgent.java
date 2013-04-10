@@ -45,21 +45,19 @@ import edu.cwru.sepia.util.Direction;
 
 /**
  * @author Derrick Tilsner
- * @author Sam Fleckenob
+ * @author Sam Fleckenstein
  *
  */
 public class ProbAgent extends Agent {
 	private static final long serialVersionUID = -4047208702628325380L;
 	private static final Logger logger = Logger.getLogger(ProbAgent.class.getCanonicalName());
 	private static final double APPROX_TOWER_DENSITY = 0.0085;
-//	private static final Point[] deltaValues = new Point[16];
 	private static final double MAX_EXPLORE_FACTOR = .3;
 
 	private int boardSizeRow;
 	private int boardSizeColumn;
 	private boolean hasSeen[][];
 	private double towerProb[][];
-	private int goodPath[][];
 	private int numVisits[][];
 	private int numHits[][];
 	private boolean seenGold = false;
@@ -74,7 +72,6 @@ public class ProbAgent extends Agent {
 	private int step;
 	private ArrayList<Integer> peasantIds;
 	private ArrayList<Integer> townhallIds;
-	private ArrayList<Point> nextPeasantLocs;
 	
 	private Direction directions[] = new Direction[8];
 	private double avgBoardSize;
@@ -86,8 +83,6 @@ public class ProbAgent extends Agent {
 		boardSizeRow = 0;
 		boardSizeColumn = 0;
 		
-//		pathFoundProb = 0.0;
-		
 		producedPeasant = false;
 		
 		directions[0] = Direction.NORTHEAST;
@@ -98,26 +93,6 @@ public class ProbAgent extends Agent {
 		directions[5] = Direction.EAST;
 		directions[6] = Direction.SOUTH;
 		directions[7] = Direction.WEST;
-		
-//		deltaValues[0] = new Point(-4, 0);
-//		deltaValues[1] = new Point(-3, -1);
-//		deltaValues[2] = new Point(-3, 0);
-//		deltaValues[3] = new Point(-3, 1);
-//		
-//		deltaValues[4] = new Point(4, 0);
-//		deltaValues[5] = new Point(3, -1);
-//		deltaValues[6] = new Point(3, 0);
-//		deltaValues[7] = new Point(3, 1);
-//		
-//		deltaValues[8] = new Point(0, -4);
-//		deltaValues[9] = new Point(1, -3);
-//		deltaValues[10] = new Point(0, -3);
-//		deltaValues[11] = new Point(-1, -3);
-//		
-//		deltaValues[12] = new Point(0, 4);
-//		deltaValues[13] = new Point(1, 3);
-//		deltaValues[14] = new Point(0, 3);
-//		deltaValues[15] = new Point(-1, 3);
 	}
 
 	
@@ -137,7 +112,6 @@ public class ProbAgent extends Agent {
 		
 		hasSeen = new boolean[boardSizeColumn][boardSizeRow];
 		towerProb = new double[boardSizeColumn][boardSizeRow];
-		goodPath = new int[boardSizeColumn][boardSizeRow];
 		numVisits = new int[boardSizeColumn][boardSizeRow];
 		numHits = new int[boardSizeColumn][boardSizeRow];
 		
@@ -145,31 +119,10 @@ public class ProbAgent extends Agent {
 			for(int j = 0; j < boardSizeRow; j++) {
 				hasSeen[i][j] = false;
 				towerProb[i][j] = APPROX_TOWER_DENSITY;
-//				towerProb[i][j] = 0;
-				goodPath[i][j] = 0;
 				numVisits[i][j] = 0;
 				numHits[i][j] = 0;
 			}
 		}
-//		boolean smallMap = (boardSizeColumn < 32);
-//		if(smallMap) {
-//			towerProb[2][1] = 1;
-//			towerProb[14][7] = 1;//TODO remember to not hard code this
-//			towerProb[6][10] = 1;
-//			towerProb[16][17]= 1;
-//		} else {
-//			towerProb[5][3] = 1;
-//			towerProb[14][7] = 1;
-//			towerProb[16][8] = 1;
-//			towerProb[22][11] = 1;
-//			towerProb[24][11] = 1;
-//			towerProb[6][13] = 1;
-//			towerProb[8][13] = 1;
-//			towerProb[30][17] = 1;
-//			towerProb[24][21] = 1;
-//			towerProb[23][25] = 1;
-//			towerProb[6][24] = 1;
-//		}
 		
 		List<Integer> allUnitIds = currentState.getAllUnitIds();
 		HashMap<Integer, Integer> peasantHP = new HashMap<Integer, Integer>();
@@ -193,7 +146,7 @@ public class ProbAgent extends Agent {
 			}
 		}
 		
-		prevState = new PreviousState(peasantIds, peasantHP, peasantLoc, boardSizeColumn, boardSizeRow);
+		prevState = new PreviousState(peasantIds, peasantHP, peasantLoc);
 		
 		return middleStep(newState, statehistory);
 	}
@@ -211,7 +164,6 @@ public class ProbAgent extends Agent {
 		
 		prevState.removeMarked();
 		
-		//TODO this assumes that the peasant takes one turn to produce
 		if(producedPeasant) {
 			List<Integer> allUnitIds = currentState.getAllUnitIds();
 			peasantIds = new ArrayList<Integer>();
@@ -229,11 +181,9 @@ public class ProbAgent extends Agent {
 			producedPeasant = false;
 		}
 		
-		nextPeasantLocs = new ArrayList<Point>();
-		
 		for(int peasantID : prevState.getPeasantIds()) {
 			if(!currentState.getUnitIds(0).contains(peasantID)) {		//peasant dies
-				Point peasantLoc = prevState.getPeasantLoc(peasantID);	//TODO check if this is updating the right location
+				Point peasantLoc = prevState.getPeasantLoc(peasantID);
 				numHits[peasantLoc.x][peasantLoc.y]++;
 				numVisits[peasantLoc.x][peasantLoc.y]++;
 				updateTowerProbs(true, peasantLoc.x, peasantLoc.y);
@@ -265,11 +215,13 @@ public class ProbAgent extends Agent {
 				updateTowerProbs(false, peasantX, peasantY);
 			}
 		}	
-		
+
+		//you failed
+		if(peasantIds.size() == 0) {
+			terminalStep(currentState, statehistory);
+		}
 		int peasantID = peasantIds.get(0);
 		UnitView peasant = currentState.getUnit(peasantID);
-		int peasantX = peasant.getXPosition();
-		int peasantY = peasant.getYPosition();
 		//DECIDE MOVE PHASE
 		Action b = null;
 		
@@ -284,10 +236,8 @@ public class ProbAgent extends Agent {
 		
 		//peasant actions
 		if(seenGold && peasant.getCargoAmount() == 0 && adjacentToGold(peasant)) { //adjacent to gold and has nothing in hand, gather
-			nextPeasantLocs.add(new Point(peasantX, peasantY));
 			b = new TargetedAction(peasantID, ActionType.COMPOUNDGATHER, goldId);
 		} else if(peasant.getCargoAmount() != 0 && adjacentToTownhall(peasant)) { //adjacent to townhall and has something in hand, deposit
-			nextPeasantLocs.add(new Point(peasantX, peasantY));
 			b = new TargetedAction(peasantID, ActionType.COMPOUNDDEPOSIT, townhallIds.get(0));
 		} else { //move somewhere
 			Direction toMove = findNextMove(peasantID);
@@ -295,9 +245,7 @@ public class ProbAgent extends Agent {
 		}
 		
 		builder.put(peasantID, b);
-//		}
-		
-		printTowerProbs();
+//		printTowerProbs();
 
 		//EXECUTE MOVE PHASE
 		
@@ -313,6 +261,9 @@ public class ProbAgent extends Agent {
 
 		if(logger.isLoggable(Level.FINE)) {
 			logger.fine("Congratulations! You have finished the task!");
+		} else {
+			logger.fine("Congratualations! All your peasants died!");
+			System.exit(0);
 		}
 	}
 
@@ -360,21 +311,6 @@ public class ProbAgent extends Agent {
 	 * @param y - y peasant location
 	 */
 	private void setSeenLocations(int peasantId, int x, int y) {
-		//determine if you're on a good path
-		UnitView peasant = currentState.getUnit(peasantId);
-		boolean hasCargo = (peasant.getCargoAmount() > 0);
-		Boolean hadCargo = prevState.getHasCargo(peasantId, x, y);
-		if(hadCargo != null && hadCargo.booleanValue() == hadCargo) {
-			goodPath[x][y] -= 2;
-		} else {
-			goodPath[x][y] += 1;
-		}
-//		if(goodPath[x][y] > 6) {
-//			goodPath[x][y] = 6;
-//		} else if(goodPath[x][y] < -6) {
-//			goodPath[x][y] = -6;
-//		}
-		prevState.setHasCargo(peasantId, x, y, hasCargo);
 		//sets every location within range of sight to true
 		Point seen = new Point();
 		for(int i = -2; i <= 2; i++) {
@@ -422,10 +358,6 @@ public class ProbAgent extends Agent {
 		int newX = currentX;
 		int newY = currentY;
 		
-		UnitView townhall = currentState.getUnit(townhallIds.get(0));
-		int townhallX = townhall.getXPosition();
-		int townhallY = townhall.getYPosition();
-		
 		int deltaX = 0;
 		int deltaY = 0;
 		for(Direction dir : directions) { 	
@@ -464,15 +396,10 @@ public class ProbAgent extends Agent {
 				break;
 			}
 			
-			//TODO don't move onto other peasants
-			Point nextLoc = new Point(currentX + deltaX, currentY + deltaY);
-			
-			boolean moveOntoTownhall = ((currentX + deltaX == townhallX) && (currentY + deltaY == townhallY));
 			boolean hasCargo = peasant.getCargoAmount() > 0;
 			if(!currentState.inBounds(currentX + deltaX, currentY + deltaY)
 					|| currentState.isResourceAt(currentX + deltaX, currentY + deltaY)
 					|| currentState.isUnitAt(currentX + deltaX, currentY + deltaY)) {
-//					|| nextPeasantLocs.contains(nextLoc)) {
 				continue;
 			}
 			
@@ -484,11 +411,8 @@ public class ProbAgent extends Agent {
 				newX = currentX + deltaX;
  				newY = currentY + deltaY;
 			}
-//			System.out.println("PeasantId: " + peasantID + " Current prob: " + currentProb + " (" + (currentX + deltaX) + ", " + (currentY + deltaY) + ")");
 		}
-//		System.out.println("PeasantId: " + peasantID + " min prob: " + minProb + " (" + newX + ", " + newY + ")");
-//		System.out.println();
-		nextPeasantLocs.add(new Point(newX, newY));
+		prevState.setPeasantLoc(peasantID, newX, newY);
 		return dirToMove;
 	}
 
@@ -508,10 +432,79 @@ public class ProbAgent extends Agent {
 		double xProbs = 0;
 		double yProbs = 0;
 		
-		double reward = 0.2;
+		double reward = 0.5;
 		if(toGold) {
 			currentDistance = Math.abs(goldLoc.x - currentX) + Math.abs(goldLoc.y - currentY);
 			nextDistance = Math.abs(goldLoc.x - nextX) + Math.abs(goldLoc.y - nextY);
+			
+			//This next section is calculating the probability density of
+			//the spaces that are in the direction of the goal.
+			//The agent is then more likely to move towards the one with the lower density.
+			double leftProb = 0;
+			double rightProb = 0;
+			double aboveProb = 0;
+			double belowProb = 0;
+			int leftSquares = 0;
+			int rightSquares = 0;
+			int aboveSquares = 0;
+			int belowSquares = 0;
+			for(int i = 0; i < boardSizeColumn; i++) {
+				for(int j = 0; j < boardSizeRow; j++) {
+					if(currentX < i) {
+						leftProb += towerProb[i][j];
+						leftSquares++;
+					} else {
+						rightProb += towerProb[i][j];
+						rightSquares++;
+					}
+					
+					if(currentY < j) {
+						belowProb += towerProb[i][j];
+						belowSquares++;
+					} else {
+						aboveProb += towerProb[i][j];
+						aboveSquares++;
+					}
+				}
+			}
+			leftProb /= (leftSquares + Math.random() * 10);
+			rightProb /= (rightSquares + Math.random() * 10);
+			aboveProb /= (aboveSquares + Math.random() * 10);
+			belowProb /= (belowSquares + Math.random() * 10);
+			
+			if(leftProb <= rightProb
+					&& leftProb <= aboveProb
+					&& leftProb <= belowProb) {
+				if(nextX < currentX) {
+					objectiveValue -= .1;
+				} else {
+					objectiveValue += .1;
+				}
+			} else if(rightProb <= leftProb
+					&& rightProb <= aboveProb
+					&& rightProb <= belowProb) {
+				if(nextX > currentX) {
+					objectiveValue -= .1;
+				} else {
+					objectiveValue += .1;
+				}
+			} else if(aboveProb <= leftProb
+					&& aboveProb <= rightProb
+					&& aboveProb <= belowProb) {
+				if(nextY < currentY) {
+					objectiveValue -= .1;
+				} else {
+					objectiveValue += .1;
+				}
+			} else if(belowProb <= leftProb
+					&& belowProb <= rightProb
+					&& belowProb <= aboveProb) {
+				if(nextY > currentY) {
+					objectiveValue -= .1;
+				} else {
+					objectiveValue += .1;
+				}
+			}
 			
 			for(int i = currentX; i < goldLoc.x; i++) {
 				for(int j = 0; j < boardSizeRow; j++) {
@@ -531,9 +524,9 @@ public class ProbAgent extends Agent {
 			
 			if(currentX < nextX) {
 				if(xProbs < yProbs) {
-					objectiveValue -= reward;
+					objectiveValue -= reward / nextDistance;
 				} else {
-					objectiveValue += reward;
+					objectiveValue += reward / nextDistance;
 				}
 			}
 			if(currentY > nextY) {
@@ -580,28 +573,15 @@ public class ProbAgent extends Agent {
  		}
 		
 		if(nextDistance < currentDistance) {
-			objectiveValue -= 0.3 * (currentDistance - nextDistance);
+			objectiveValue -= 0.4 * (currentDistance - nextDistance);
+		}
+		if(currentDistance < 7) {
+			objectiveValue -= 0.2 * (currentDistance - nextDistance);
 		}
 		
-//		boolean hasCargo = (peasant.getCargoAmount() > 0);
-//		Boolean hadCargo = prevState.getHasCargo(peasantId, nextX, nextY);
-//		double exploreFactor = -exploreCoeff * currentDistance * (currentDistance - avgBoardSize);// * (-.5 * numVisits[nextX][nextY] + 1);
-//		
-//		if(hadCargo != null && hadCargo.booleanValue() != hasCargo) {
-//			objectiveValue -= 0.2;
-//		} else if(hadCargo == null) {
-//		objectiveValue -= exploreFactor;
-//			objectiveValue -= (numVisits[currentX][currentY] - numVisits[nextX][nextY]) * exploreFactor;
-//		} else {
-//			objectiveValue += 0.5;
-//		}
-		
-//			System.out.println("Explore: " + exploreFactor);
-//			System.out.println("Dist: " + (double)(currentDistance - avgBoardSize));
-//			System.out.println("Linear: " + (double)(-.5 * numVisits[nextX][nextY] + 1));
-//			objectiveValue -= 0.08 * goodPath[nextX][nextY];
+		double exploreFactor = -exploreCoeff * currentDistance * (currentDistance - avgBoardSize);// * (-.5 * numVisits[nextX][nextY] + 1);
 
-		return objectiveValue;
+		return objectiveValue - exploreFactor;
 	}
 	
 	/**
@@ -670,6 +650,9 @@ public class ProbAgent extends Agent {
 							if(towerProb[tower.x][tower.y] < .000001) {
 								towerProb[tower.x][tower.y] = 0;
 							}
+							if(towerProb[tower.x][tower.y] > .5) {
+								towerProb[tower.x][tower.y] = 1;
+							}
 							towerProb[tower.x][tower.y] /= changedSum;
 						}
 					}
@@ -699,20 +682,13 @@ public class ProbAgent extends Agent {
 						if(towerProb[i][j] < .000001) {
 							towerProb[i][j] = 0;
 						}
+						if(towerProb[i][j] > .5) {
+							towerProb[i][j] = 1;
+						}
 						totalSum += towerProb[i][j];
 					}
 				}
 			}
-			
-//			for(int i = 0; i < towerProb.length; i++) {
-//				for(int j = 0; j < towerProb[i].length; j++) {
-//					if(currentState.inBounds(i, j) 
-//							&& !hasSeen[i][j]
-//							&& towerProb[i][j] != 1) {
-//						towerProb[i][j] = towerProb[i][j] / (totalSum * APPROX_TOWER_DENSITY);
-//					}
-//				}
-//			}
 			
 			for(int i = -4; i <= 4; i++) {
 				for(int j = -4; j <= 4; j++) {
@@ -727,21 +703,6 @@ public class ProbAgent extends Agent {
 				}
 			}
 		}
-		
-		
-//		for(double[] array : towerProb) {
-//			for(double prob : array) {
-//				probSum += prob;
-//			}
-//		}
-//		
-//		for(int i = 0; i < towerProb.length; i++) {
-//			for(int j = 0; j < towerProb[i].length; j++) {
-//				if(towerProb[i][j] != 1) {
-//					towerProb[i][j] /= probSum;
-//				}
-//			}
-//		}
 	}
 	
 	private double binomialCoeff(int numVisits, int numHits) {
